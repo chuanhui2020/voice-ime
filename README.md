@@ -114,14 +114,23 @@ TextInjector.inject()
 
 `LLMService` 调用 OpenAI 兼容的 `/chat/completions` 接口，对识别结果进行轻量纠错：
 
-- 配置项：Base URL、API Key、Model，存储在 UserDefaults 中
+- 配置项：Base URL（需以 `/v1` 结尾）、API Key、Model，存储在 UserDefaults 中
 - 参数：`temperature: 0.0`，`max_tokens: 2048`，10 秒超时
-- System Prompt 定位为"语音识别后处理器"，规则严格：
+- System Prompt 根据当前语言动态生成（中文 prompt 处理中文场景），包含 few-shot 示例：
   - 修正中文谐音错误（同音字纠错）
-  - 修正被误识别为中文的英文技术术语（如 配森→Python、杰森→JSON、爪哇→Java、西加→C++）
+  - 修正被误识别为中文的英文技术术语（如 配森→Python、杰森→JSON、爪哇→Java、西加加→C++），并鼓励 LLM 根据发音相似度自行推理
   - 不改写、不润色、不重组文本
   - 只返回修正后的文本，不附带解释
 - 请求失败或返回空时，fallback 到原始识别文本
+- 每次 LLM 调用的请求和响应记录在 `logs/llm_log.jsonl`，保留最近 100 条
+
+## LLM 配置
+
+在菜单栏图标的下拉菜单中打开 LLM Settings，填写：
+
+- Base URL：OpenAI 兼容的 API 地址，需以 `/v1` 结尾（如 `https://api.openai.com/v1`）
+- API Key：API 密钥
+- Model：模型名称（如 `gpt-4o-mini`）
 
 ## 文本注入
 
@@ -135,12 +144,22 @@ TextInjector.inject()
 ## 构建与运行
 
 ```bash
-swift build
-swift run
+# 构建并运行
+make run
+
+# 仅构建（生成 VoiceIME.app）
+make build
+
+# 安装到 /Applications
+make install
+
+# 清理构建产物
+make clean
 ```
 
 需要在系统设置中授予以下权限：
 - 麦克风访问权限
+- 语音识别权限
 - 辅助功能权限（用于全局按键监听和模拟粘贴）
 
-> 注意：每次重新 codesign 后需要在系统设置 → 隐私与安全性 → 辅助功能中重新添加应用。
+> 注意：每次重新构建后需要在系统设置 → 隐私与安全性 → 辅助功能中重新添加应用。

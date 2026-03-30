@@ -115,8 +115,32 @@ class LLMService {
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+        return sendRequest(request, text: text, locale: locale, retriesLeft: 3, completion: completion)
+    }
+
+    private static let maxRetries = 3
+
+    private func sendRequest(_ request: URLRequest, text: String, locale: String, retriesLeft: Int, completion: @escaping (String) -> Void) -> URLSessionDataTask {
+        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             if let error = error {
+                let nsError = error as NSError
+                // Retry on network connection lost (-1005) or timed out (-1001)
+                if retriesLeft > 0 && (nsError.code == -1005 || nsError.code == -1001) {
+                    let attempt = LLMService.maxRetries - retriesLeft + 1
+                    let delay = 0.5 * pow(2.0, Double(attempt - 1)) // 0.5s, 1s, 2s
+                    LLMService.appendLog([
+                        "type": "retry",
+                        "input": text,
+                        "locale": locale,
+                        "error": error.localizedDescription,
+                        "attempt": attempt,
+                        "delay": delay
+                    ])
+                    DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                        _ = self?.sendRequest(request, text: text, locale: locale, retriesLeft: retriesLeft - 1, completion: completion)
+                    }
+                    return
+                }
                 LLMService.appendLog([
                     "type": "error",
                     "input": text,
