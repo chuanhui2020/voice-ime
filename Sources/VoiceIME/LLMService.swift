@@ -2,6 +2,48 @@ import Foundation
 
 class LLMService {
 
+    private static let maxLogEntries = 100
+
+    private static var logFileURL: URL = {
+        // When running as .app bundle (make run), use bundle's parent directory
+        // When running via swift run, use current directory
+        let base: URL
+        if let bundlePath = Bundle.main.bundleURL.path.components(separatedBy: ".app").first,
+           bundlePath != Bundle.main.bundleURL.path {
+            base = URL(fileURLWithPath: bundlePath).deletingLastPathComponent()
+        } else {
+            base = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        }
+        let dir = base.appendingPathComponent("logs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("llm_log.jsonl")
+    }()
+
+    private static func appendLog(_ entry: [String: Any]) {
+        var entry = entry
+        let formatter = ISO8601DateFormatter()
+        entry["timestamp"] = formatter.string(from: Date())
+
+        guard let data = try? JSONSerialization.data(withJSONObject: entry),
+              let line = String(data: data, encoding: .utf8) else { return }
+
+        // Read existing lines
+        var lines: [String] = []
+        if let content = try? String(contentsOf: logFileURL, encoding: .utf8) {
+            lines = content.components(separatedBy: "\n").filter { !$0.isEmpty }
+        }
+
+        lines.append(line)
+
+        // Keep only last maxLogEntries
+        if lines.count > maxLogEntries {
+            lines = Array(lines.suffix(maxLogEntries))
+        }
+
+        let output = lines.joined(separator: "\n") + "\n"
+        try? output.write(to: logFileURL, atomically: true, encoding: .utf8)
+    }
+
     static func systemPrompt(locale: String) -> String {
         let langHint: String
         switch locale {
@@ -73,16 +115,43 @@ class LLMService {
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
         URLSession.shared.dataTask(with: request) { data, response, error in
-            guard let data = data, error == nil,
+            if let error = error {
+                LLMService.appendLog([
+                    "type": "error",
+                    "input": text,
+                    "locale": locale,
+                    "error": error.localizedDescription
+                ])
+                DispatchQueue.main.async { completion(text) }
+                return
+            }
+
+            guard let data = data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let choices = json["choices"] as? [[String: Any]],
                   let message = choices.first?["message"] as? [String: Any],
                   let content = message["content"] as? String else {
+                let body = data.flatMap { String(data: $0, encoding: .utf8) } ?? "no data"
+                LLMService.appendLog([
+                    "type": "error",
+                    "input": text,
+                    "locale": locale,
+                    "error": "parse failed",
+                    "response_body": body
+                ])
                 DispatchQueue.main.async { completion(text) }
                 return
             }
             let refined = content.trimmingCharacters(in: .whitespacesAndNewlines)
-            DispatchQueue.main.async { completion(refined.isEmpty ? text : refined) }
+            let result = refined.isEmpty ? text : refined
+            LLMService.appendLog([
+                "type": "success",
+                "input": text,
+                "output": result,
+                "locale": locale,
+                "changed": text != result
+            ])
+            DispatchQueue.main.async { completion(result) }
         }.resume()
     }
 

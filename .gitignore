@@ -4,3 +4,4 @@
 VoiceIME.app/
 *.xcodeproj/
 xcuserdata/
+logs/
