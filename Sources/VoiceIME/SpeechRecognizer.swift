@@ -60,6 +60,14 @@ class SpeechRecognizer {
     func stop() {
         recognitionRequest?.endAudio()
         recognitionRequest = nil
+        // Don't cancel task here - let it deliver the final result
+        // Task will be cancelled in forceStop() if needed
+    }
+
+    func forceStop() {
+        recognitionRequest?.endAudio()
+        recognitionRequest = nil
+        recognitionTask?.cancel()
         recognitionTask = nil
     }
 }

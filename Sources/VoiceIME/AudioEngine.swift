@@ -7,6 +7,10 @@ class AudioEngine {
 
     func start() throws {
         let inputNode = audioEngine.inputNode
+
+        // Remove existing tap to prevent duplicate installation
+        inputNode.removeTap(onBus: 0)
+
         let format = inputNode.outputFormat(forBus: 0)
 
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in

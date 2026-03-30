@@ -13,6 +13,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var isRecording = false
     private var finalResultReceived = false
+    private var timeoutWorkItem: DispatchWorkItem?
+    private var currentLLMTask: URLSessionDataTask?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         requestPermissions()
@@ -80,6 +82,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func startRecording() {
         guard !isRecording else { return }
+
+        // Cancel any pending state from previous recording
+        timeoutWorkItem?.cancel()
+        timeoutWorkItem = nil
+        currentLLMTask?.cancel()
+        currentLLMTask = nil
+        capsuleWindow.dismissImmediately()
+        speechRecognizer.forceStop()
+        audioEngine.stop()
+
         isRecording = true
         finalResultReceived = false
 
@@ -112,12 +124,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioEngine.stop()
         speechRecognizer.stop()
 
-        // If no final result received after stopping, wait a bit then dismiss
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+        // Cancellable timeout - won't fire if new recording starts
+        let workItem = DispatchWorkItem { [weak self] in
             guard let self = self, !self.finalResultReceived else { return }
             self.finalResultReceived = true
             self.capsuleWindow.hide()
         }
+        timeoutWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: workItem)
     }
 
     // MARK: - Result handling
@@ -132,7 +146,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         if Settings.shared.llmEnabled && Settings.shared.isLLMConfigured {
             capsuleWindow.showRefining()
-            llmService.refine(trimmed, locale: Settings.shared.selectedLocale) { [weak self] refined in
+            currentLLMTask = llmService.refine(trimmed, locale: Settings.shared.selectedLocale) { [weak self] refined in
+                self?.currentLLMTask = nil
                 self?.injectAndDismiss(refined)
             }
         } else {

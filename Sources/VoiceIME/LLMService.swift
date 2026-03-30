@@ -83,17 +83,18 @@ class LLMService {
         """
     }
 
-    func refine(_ text: String, locale: String, completion: @escaping (String) -> Void) {
+    @discardableResult
+    func refine(_ text: String, locale: String, completion: @escaping (String) -> Void) -> URLSessionDataTask? {
         let settings = Settings.shared
         guard settings.isLLMConfigured else {
             completion(text)
-            return
+            return nil
         }
 
         let baseURL = settings.llmBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard let url = URL(string: "\(baseURL)/chat/completions") else {
             completion(text)
-            return
+            return nil
         }
 
         var request = URLRequest(url: url)
@@ -114,7 +115,7 @@ class LLMService {
 
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 LLMService.appendLog([
                     "type": "error",
@@ -152,7 +153,9 @@ class LLMService {
                 "changed": text != result
             ])
             DispatchQueue.main.async { completion(result) }
-        }.resume()
+        }
+        task.resume()
+        return task
     }
 
     func testConnection(baseURL: String, apiKey: String, model: String, completion: @escaping (Bool, String) -> Void) {

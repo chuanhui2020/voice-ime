@@ -49,6 +49,16 @@ class CapsuleWindow {
         }
     }
 
+    func dismissImmediately() {
+        NSAnimationContext.beginGrouping()
+        NSAnimationContext.current.duration = 0
+        panel.animator().alphaValue = 0
+        NSAnimationContext.endGrouping()
+        panel.orderOut(nil)
+        viewController.updateText("")
+        viewController.waveformView.reset()
+    }
+
     func hide(completion: (() -> Void)? = nil) {
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.22
