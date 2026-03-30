@@ -45,7 +45,7 @@ class TextInjector {
         // 6. Restore original clipboard after paste completes
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             // Only restore if nothing else has changed the clipboard
-            if pasteboard.changeCount != originalChangeCount + 1 && originalData.isEmpty {
+            if pasteboard.changeCount != originalChangeCount + 1 || originalData.isEmpty {
                 return
             }
             pasteboard.clearContents()

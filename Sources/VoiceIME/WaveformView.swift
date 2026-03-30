@@ -42,6 +42,10 @@ class WaveformView: NSView {
         animationTimer = nil
     }
 
+    deinit {
+        animationTimer?.invalidate()
+    }
+
     private func tick() {
         if currentLevel > smoothedLevel {
             smoothedLevel += (currentLevel - smoothedLevel) * attackRate
