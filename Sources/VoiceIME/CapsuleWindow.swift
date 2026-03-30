@@ -57,6 +57,7 @@ class CapsuleWindow {
         panel.orderOut(nil)
         viewController.updateText("")
         viewController.waveformView.reset()
+        viewController.hideRefiningMode()
     }
 
     func hide(completion: (() -> Void)? = nil) {
@@ -105,7 +106,22 @@ class CapsuleWindow {
     }
 
     func showRefining() {
-        viewController.updateText("Refining...")
+        viewController.showRefiningMode()
+        let newWidth = viewController.calculateWidth(for: "AI 润色中...")
+        guard let screen = NSScreen.main else { return }
+        let screenFrame = screen.visibleFrame
+        let x = screenFrame.origin.x + (screenFrame.width - newWidth) / 2
+        let y = panel.frame.origin.y
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.25
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            ctx.allowsImplicitAnimation = true
+            panel.animator().setFrame(
+                NSRect(x: x, y: y, width: newWidth, height: 56),
+                display: true
+            )
+        }
     }
 
     private func positionAtBottomCenter() {

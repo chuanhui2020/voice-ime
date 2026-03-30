@@ -4,6 +4,14 @@ class LLMService {
 
     private static let maxLogEntries = 100
 
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 10
+        config.httpShouldUsePipelining = false
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: config)
+    }()
+
     private static var logFileURL: URL = {
         // When running as .app bundle (make run), use bundle's parent directory
         // When running via swift run, use current directory
@@ -121,7 +129,7 @@ class LLMService {
     private static let maxRetries = 3
 
     private func sendRequest(_ request: URLRequest, text: String, locale: String, retriesLeft: Int, completion: @escaping (String) -> Void) -> URLSessionDataTask {
-        let task = URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        let task = session.dataTask(with: request) { [weak self] data, response, error in
             if let error = error {
                 let nsError = error as NSError
                 // Retry on network connection lost (-1005) or timed out (-1001)
@@ -202,7 +210,7 @@ class LLMService {
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        session.dataTask(with: request) { data, response, error in
             if let error = error {
                 DispatchQueue.main.async { completion(false, error.localizedDescription) }
                 return
