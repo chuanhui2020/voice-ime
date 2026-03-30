@@ -2,18 +2,46 @@ import Foundation
 
 class LLMService {
 
-    static let systemPrompt = """
-    You are a speech recognition post-processor. Your ONLY job is to fix obvious speech recognition errors. Rules:
-    1. Fix Chinese homophone errors (谐音错误) that are clearly wrong in context.
-    2. Fix English technical terms that were incorrectly transcribed as Chinese, for example: 配森→Python, 杰森→JSON, 爪哇→Java, 西加加→C++, 杰爱斯→JS, 瑞阿克特→React, 诺德→Node, 吉特→Git, 吉特哈布→GitHub, 多克→Docker, 库伯奈提斯→Kubernetes, 艾皮爱→API, 优阿尔艾尔→URL, 爱奇迪皮→HTTP.
-    3. NEVER rewrite, rephrase, polish, or reorganize the text.
-    4. NEVER add or remove punctuation beyond what's needed for a fix.
-    5. NEVER delete any content that looks correct.
-    6. If the input looks correct, return it EXACTLY as-is with zero changes.
-    7. Return ONLY the corrected text, no explanations.
-    """
+    static func systemPrompt(locale: String) -> String {
+        let langHint: String
+        switch locale {
+        case "zh-CN": langHint = "简体中文"
+        case "zh-TW": langHint = "繁体中文"
+        case "ja-JP": langHint = "日语"
+        case "ko-KR": langHint = "韩语"
+        default: langHint = "英语"
+        }
 
-    func refine(_ text: String, completion: @escaping (String) -> Void) {
+        return """
+        你是一个语音识别纠错助手。用户正在使用\(langHint)语音输入，下面的文本是语音识别引擎的原始输出，可能包含错误。
+
+        你的任务：
+        1. 【最重要】修复被错误转写为中文的英文单词。语音识别引擎经常把英文单词按发音转写成中文，你需要根据发音和上下文还原为正确的英文。常见模式：
+           - 编程语言：配森/派森→Python，杰森→JSON，爪哇→Java，西加加/C加加→C++，斯威夫特→Swift，科特林→Kotlin，拉斯特→Rust，泰普斯克里普特→TypeScript
+           - 工具框架：瑞阿克特/瑞艾克特→React，诺德→Node，吉特→Git，吉特哈布→GitHub，多克/道克→Docker，库伯奈提斯→Kubernetes，恩金艾克斯→Nginx，瑞迪斯→Redis
+           - 通用术语：艾皮爱/爱皮爱→API，优阿尔艾尔→URL，爱奇迪皮→HTTP，埃斯克尤艾尔→SQL，西艾尔爱→CLI，艾斯蒂开→SDK，哈希→Hash，托肯→Token，瑟沃→Server，克莱恩特→Client
+           - 以上只是示例，任何听起来像英文的中文音译都应该还原。根据发音相似度和上下文判断。
+        2. 修复明显的同音字错误（如"已经"写成"以经"，"那里"写成"哪里"等）。
+        3. 修复明显不合理的断句和标点。
+        4. 不要改写、润色、重组句子结构，不要删除任何看起来正确的内容。
+        5. 只返回修正后的文本，不要任何解释。
+
+        示例：
+        输入：我用配森写了一个爱皮爱接口，部署在多克容器里
+        输出：我用Python写了一个API接口，部署在Docker容器里
+
+        输入：这个杰森文件的格式不对，需要用诺德杰爱斯来解析
+        输出：这个JSON文件的格式不对，需要用Node.js来解析
+
+        输入：我们用瑞阿克特做前端吉特哈布上有代码
+        输出：我们用React做前端，GitHub上有代码
+
+        输入：把这个数据库的埃斯克尤艾尔查询优化一下
+        输出：把这个数据库的SQL查询优化一下
+        """
+    }
+
+    func refine(_ text: String, locale: String, completion: @escaping (String) -> Void) {
         let settings = Settings.shared
         guard settings.isLLMConfigured else {
             completion(text)
@@ -35,7 +63,7 @@ class LLMService {
         let body: [String: Any] = [
             "model": settings.llmModel,
             "messages": [
-                ["role": "system", "content": LLMService.systemPrompt],
+                ["role": "system", "content": LLMService.systemPrompt(locale: locale)],
                 ["role": "user", "content": text]
             ],
             "temperature": 0.0,

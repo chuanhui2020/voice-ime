@@ -132,7 +132,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         if Settings.shared.llmEnabled && Settings.shared.isLLMConfigured {
             capsuleWindow.showRefining()
-            llmService.refine(trimmed) { [weak self] refined in
+            llmService.refine(trimmed, locale: Settings.shared.selectedLocale) { [weak self] refined in
                 self?.injectAndDismiss(refined)
             }
         } else {
