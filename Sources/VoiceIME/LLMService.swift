@@ -206,21 +206,22 @@ class LLMService {
             }
             let refined = content.trimmingCharacters(in: .whitespacesAndNewlines)
             let result = refined.isEmpty ? text : refined
-            // Record to conversation history (only store refined result)
-            self?.history.append(ConversationEntry(refinedText: result, timestamp: Date()))
-            if let count = self?.history.count, count > LLMService.maxHistoryEntries {
-                self?.history.removeFirst(count - LLMService.maxHistoryEntries)
-            }
             LLMService.appendLog([
                 "type": "success",
                 "input": text,
                 "output": result,
                 "locale": locale,
                 "changed": text != result,
-                "history_count": historyCount,
-                "history": (self?.history.prefix(historyCount) ?? []).map { $0.refinedText }
+                "history_count": historyCount
             ])
-            DispatchQueue.main.async { completion(result) }
+            DispatchQueue.main.async {
+                // Record to conversation history on main thread (same thread as removeAll in refine())
+                self?.history.append(ConversationEntry(refinedText: result, timestamp: Date()))
+                if let count = self?.history.count, count > LLMService.maxHistoryEntries {
+                    self?.history.removeFirst(count - LLMService.maxHistoryEntries)
+                }
+                completion(result)
+            }
         }
         task.resume()
         return task
