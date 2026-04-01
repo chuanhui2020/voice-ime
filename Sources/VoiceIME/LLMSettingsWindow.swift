@@ -6,6 +6,7 @@ class LLMSettingsWindow {
     private let baseURLField = NSTextField()
     private let apiKeyField = NSSecureTextField()
     private let modelField = NSTextField()
+    private let dictField = NSTextView()
     private let statusLabel = NSTextField(labelWithString: "")
 
     func show() {
@@ -16,7 +17,7 @@ class LLMSettingsWindow {
         }
 
         let w = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 280),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 420),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -32,7 +33,7 @@ class LLMSettingsWindow {
         let padding: CGFloat = 20
         let labelWidth: CGFloat = 100
         let fieldHeight: CGFloat = 24
-        var y: CGFloat = 230
+        var y: CGFloat = 370
 
         // API Base URL
         let urlLabel = NSTextField(labelWithString: "API Base URL:")
@@ -71,7 +72,30 @@ class LLMSettingsWindow {
         modelField.stringValue = Settings.shared.llmModel
         contentView.addSubview(modelField)
 
-        y -= 50
+        y -= 30
+
+        // Custom Dictionary
+        let dictLabel = NSTextField(labelWithString: "Custom Dict:")
+        dictLabel.frame = NSRect(x: padding, y: y, width: labelWidth, height: fieldHeight)
+        dictLabel.alignment = .right
+        contentView.addSubview(dictLabel)
+
+        let scrollView = NSScrollView(frame: NSRect(x: padding + labelWidth + 8, y: y - 80, width: 330, height: 100))
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .bezelBorder
+        dictField.isEditable = true
+        dictField.isRichText = false
+        dictField.font = .systemFont(ofSize: 13)
+        dictField.autoresizingMask = [.width, .height]
+        dictField.string = Settings.shared.customDictionary
+        scrollView.documentView = dictField
+        dictField.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
+        dictField.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        dictField.isVerticallyResizable = true
+        dictField.textContainer?.widthTracksTextView = true
+        contentView.addSubview(scrollView)
+
+        y -= 120
 
         // Buttons
         let testButton = NSButton(title: "Test", target: nil, action: nil)
@@ -116,6 +140,7 @@ class LLMSettingsWindow {
         Settings.shared.llmBaseURL = baseURLField.stringValue
         Settings.shared.llmAPIKey = apiKeyField.stringValue
         Settings.shared.llmModel = modelField.stringValue
+        Settings.shared.customDictionary = dictField.string
         statusLabel.stringValue = "Saved!"
         statusLabel.textColor = .systemGreen
 

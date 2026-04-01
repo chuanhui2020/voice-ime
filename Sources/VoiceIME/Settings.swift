@@ -11,6 +11,7 @@ class Settings {
         static let llmBaseURL = "llmBaseURL"
         static let llmAPIKey = "llmAPIKey"
         static let llmModel = "llmModel"
+        static let customDictionary = "customDictionary"
     }
 
     var selectedLocale: String {
@@ -40,5 +41,10 @@ class Settings {
 
     var isLLMConfigured: Bool {
         !llmBaseURL.isEmpty && !llmAPIKey.isEmpty && !llmModel.isEmpty
+    }
+
+    var customDictionary: String {
+        get { defaults.string(forKey: Keys.customDictionary) ?? "铺洗/不吸/复习/噗嘻/浦西 + 到远程 → push到远程\n铺洗/不吸/复习/噗嘻/浦西 → push" }
+        set { defaults.set(newValue, forKey: Keys.customDictionary) }
     }
 }

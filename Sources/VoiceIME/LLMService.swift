@@ -7,8 +7,7 @@ class LLMService {
     private static let historyExpirySeconds: TimeInterval = 600 // 10 minutes
 
     private struct ConversationEntry {
-        let userText: String
-        let assistantText: String
+        let refinedText: String
         let timestamp: Date
     }
 
@@ -99,7 +98,7 @@ class LLMService {
         输入：把这个数据库的埃斯克尤艾尔查询优化一下
         输出：把这个数据库的SQL查询优化一下
 
-        注意：对话历史中包含之前的语音输入（user）和你的修正结果（assistant）。请利用这些上下文来辅助纠错，例如前文提到过的专有名词、技术术语等，在后续输入中应保持一致的识别。
+        注意：如果下方提供了"最近的对话上下文"，请利用其中出现过的专有名词、技术术语等辅助纠错，在后续输入中应保持一致的识别。但请独立判断每次输入，不要盲目沿用之前的结果。
         """
     }
 
@@ -127,15 +126,21 @@ class LLMService {
         request.setValue("Bearer \(settings.llmAPIKey)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 10
 
-        // Build messages with conversation history
-        var messages: [[String: String]] = [
-            ["role": "system", "content": LLMService.systemPrompt(locale: locale)]
-        ]
-        for entry in history {
-            messages.append(["role": "user", "content": entry.userText])
-            messages.append(["role": "assistant", "content": entry.assistantText])
+        // Build system prompt with custom dictionary and history context
+        var systemContent = LLMService.systemPrompt(locale: locale)
+        let dict = settings.customDictionary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !dict.isEmpty {
+            systemContent += "\n\n【用户自定义纠错规则，优先级最高】：\n\(dict)"
         }
-        messages.append(["role": "user", "content": text])
+        if !history.isEmpty {
+            let context = history.map { $0.refinedText }.joined(separator: "\n")
+            systemContent += "\n\n最近的对话上下文（仅供参考）：\n\(context)"
+        }
+
+        let messages: [[String: String]] = [
+            ["role": "system", "content": systemContent],
+            ["role": "user", "content": text]
+        ]
 
         let body: [String: Any] = [
             "model": settings.llmModel,
@@ -201,8 +206,8 @@ class LLMService {
             }
             let refined = content.trimmingCharacters(in: .whitespacesAndNewlines)
             let result = refined.isEmpty ? text : refined
-            // Record to conversation history
-            self?.history.append(ConversationEntry(userText: text, assistantText: result, timestamp: Date()))
+            // Record to conversation history (only store refined result)
+            self?.history.append(ConversationEntry(refinedText: result, timestamp: Date()))
             if let count = self?.history.count, count > LLMService.maxHistoryEntries {
                 self?.history.removeFirst(count - LLMService.maxHistoryEntries)
             }
@@ -212,7 +217,8 @@ class LLMService {
                 "output": result,
                 "locale": locale,
                 "changed": text != result,
-                "history_count": historyCount
+                "history_count": historyCount,
+                "history": (self?.history.prefix(historyCount) ?? []).map { $0.refinedText }
             ])
             DispatchQueue.main.async { completion(result) }
         }
